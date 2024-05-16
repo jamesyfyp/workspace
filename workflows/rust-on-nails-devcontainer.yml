@@ -1,0 +1,54 @@
+name: Build Rust on Nails DevContainer
+
+on:
+  push:
+    branches:
+    - main
+    paths:
+    - 'dev-env-as-code/**'
+    - 'nails-devcontainer/**'
+    # Exclude this as it is set by semantic release
+    - '!dev-env-as-code/Dockerfile.devcontainer'
+    - '!nails-devcontainer/Dockerfile'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Docker Login
+      run: docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_TOKEN"
+    
+    - name: Build Docker file
+      run: |
+        docker build -t purtontech/rust-on-nails-devcontainer dev-env-as-code
+        docker push purtontech/rust-on-nails-devcontainer
+
+    # If this is a release
+    #   create release notes
+    #   set the docker version
+    #   
+    - name: Semantic Release
+      run: | 
+        npm i -D @semantic-release/exec
+        npm i -D @semantic-release-plus/docker
+        npm i -D @semantic-release/git
+        npx semantic-release
+
+    - name: "Publish Templates"
+      uses: devcontainers/action@v1
+      with:
+        publish-templates: "true"
+        base-path-to-templates: "./nails-devcontainer"
+        generate-docs: "true"
+
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
